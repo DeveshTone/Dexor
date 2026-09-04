@@ -1,0 +1,5 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive Icon Background: adjustable to brand blue (#1240F8), AMOLED dark (#0D1117), or any custom color -->
+    <color name="ic_launcher_background">#1240F8</color>
+</resources>
