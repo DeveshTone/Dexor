@@ -4,10 +4,11 @@ Dexor is a modern, minimal, and high-performance Android application management 
 
 ## Screenshots
 
-<!-- Add screenshots here -->
-| App List | Detailed Compilation | Batch Operations |
-|---|---|---|
-| *(Screenshot Placeholder)* | *(Screenshot Placeholder)* | *(Screenshot Placeholder)* |
+<p align="center">
+  <img src="screenshots/app_list.png" width="31%" alt="App List" />
+  <img src="screenshots/app_detail.png" width="31%" alt="App Inspection" />
+  <img src="screenshots/compilation_modes.png" width="31%" alt="Compilation Modes" />
+</p>
 
 ## Requirements
 
