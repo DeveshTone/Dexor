@@ -1,6 +1,6 @@
 ﻿# Dexor
 
-Dexor is a modern, minimal, and high-performance Android application management and ahead-of-time (AOT) compilation utility powered by the Android Runtime (`dex2oat`) and Shizuku. It provides an intuitive, fluid Jetpack Compose interface allowing users to inspect the live compilation status (compiler filters, status change reasons, installation sources) of user and system applications, run on-demand or batch DEX optimizations to boost app launch speed and runtime performance, and reclaim storage or reset compilation artifacts without needing root access.
+Dexor is a modern, minimal, and high-performance Android application management and ahead-of-time (AOT) compilation utility powered by the Android Runtime (`dex2oat`) and Shizuku. It provides an intuitive, fluid Jetpack Compose interface allowing users to inspect the live compilation status (compiler filters, status change reasons, installation sources) of user and system applications, run on-demand or batch DEX optimizations to boost app launch speed and runtime performance, and reclaim storage without needing root access.
 
 ## Screenshots
 
@@ -14,19 +14,15 @@ Dexor is a modern, minimal, and high-performance Android application management 
 
 - **Android Version:** Android 9.0 to Android 15 (API levels 28 – 35).
 - **Shizuku:** A working [Shizuku](https://github.com/RikkaApps/Shizuku) environment (running via Wireless Debugging, ADB, or Root) is required to execute elevated package compilation commands without root.
-- **Orientation:** Portrait only.
 
 ## Compilation Modes
 
-Dexor interfaces directly with Android's `cmd package compile` system commands. The available compilation filters and operations are:
+Dexor interfaces directly with Android's `cmd package compile` system commands. The available compilation filters in the app are:
 
-- **`verify`**: Runs only DEX code verification. Does not perform Ahead-Of-Time (AOT) machine code compilation. Uses minimal disk space and takes almost no time.
-- **`space`**: Optimizes the app with an emphasis on conserving storage space. Compiles code with size-reduction heuristics.
-- **`speed`**: Performs maximum Ahead-Of-Time (AOT) native compilation for all methods. Delivers the fastest execution speed and instant app launch times at the cost of higher storage usage.
-- **`speed-profile`**: Profile-guided compilation. Uses execution profiles (`.prof`) collected during app usage to compile only frequently executed ("hot") code paths, balancing peak performance with storage efficiency.
-- **`everything`**: Compiles absolutely all DEX code and classes. Highly aggressive compilation mode that provides comprehensive native code execution at maximum storage usage.
-- **`reset`**: Clears all compiled native artifacts (`.odex`, `.vdex`, `.art`) and resets the package to its initial unoptimized state.
-- **`compact`**: Triggers ART heap compaction and background secondary DEX optimization to free active memory.
+- **`verify`**: Completely clears all native code binaries. Frees up maximum storage space. Reverts the app to the raw JIT interpreter (~5s per app).
+- **`space`**: Compiles only core initialization methods. Optimizes for the lowest possible storage footprint while ensuring stable app boot times (~15s per app).
+- **`speed`**: Force-compiles all accessible app methods into native machine code. Maximizes runtime smoothness and eliminates micro-stutters (ideal for gaming) (~30s per app).
+- **`everything`**: Compiles all code and resolves all class architecture references. Provides maximum possible deep optimization but uses the most storage space (~60s per app).
 
 ## Known Limitations
 
