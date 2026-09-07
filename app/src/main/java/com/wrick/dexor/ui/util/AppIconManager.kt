@@ -57,7 +57,7 @@ class AppIconFetcher(
         if (bitmap != null) {
             try {
                 FileOutputStream(cachedFile).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    AppIconManager.compressIcon(bitmap, out)
                 }
             } catch (e: Exception) {
                 // Ignore write failures
@@ -118,15 +118,27 @@ object AppIconManager {
         } catch (e: Exception) { /* ignore */ }
     }
 
+    fun compressIcon(bitmap: Bitmap, out: java.io.OutputStream) {
+        val format = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            Bitmap.CompressFormat.WEBP_LOSSY
+        } else {
+            @Suppress("DEPRECATION")
+            Bitmap.CompressFormat.WEBP
+        }
+        bitmap.compress(format, 85, out)
+    }
+
     /**
-     * Cooperatively preheats any missing icons directly to flash disk cache.
-     * Uses a gentle throttle (12ms delay) on IO dispatcher so UI thread maintains 60 FPS.
+     * Cooperatively preheats missing icons directly to flash disk cache.
+     * Defers by 1500ms so initial app launch and initial composition/scroll complete smoothly.
      * Cancels any prior preheat job to prevent concurrent work.
      */
     fun preheatDiskCache(context: Context, packages: List<String>) {
         val cacheDir = getDiskCacheDir(context)
         preheatJob?.cancel()
         preheatJob = CoroutineScope(Dispatchers.IO).launch {
+            // Defer preheating until after initial launch animations and list rendering complete
+            delay(1500)
             val pm = context.packageManager
             for (pkg in packages) {
                 val file = File(cacheDir, "$pkg.png")
@@ -136,13 +148,13 @@ object AppIconManager {
                     val bitmap = drawableToBitmap(drawable)
                     if (bitmap != null) {
                         FileOutputStream(file).use { out ->
-                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                            compressIcon(bitmap, out)
                         }
                     }
                 } catch (e: Exception) {
                     // Ignore individual icon load errors
                 }
-                delay(12)
+                delay(25)
             }
         }
     }

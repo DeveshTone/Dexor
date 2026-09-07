@@ -16,7 +16,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,7 +26,6 @@ import com.wrick.dexor.model.AppInfo
 import com.wrick.dexor.model.InstallSource
 import com.wrick.dexor.ui.theme.DexorCodeFont
 import com.wrick.dexor.ui.theme.DexorDimensions
-import com.wrick.dexor.ui.util.AppIconImageLoader
 import com.wrick.dexor.ui.util.AppIconKey
 import coil.compose.AsyncImage
 
@@ -40,7 +38,6 @@ fun AppListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val context = LocalContext.current
     val bg = if (isSelected) Color(0xFF1E293B) else Color.Transparent
 
     Row(
@@ -78,7 +75,6 @@ fun AppListItem(
         AsyncImage(
             model = remember(app.packageName) { AppIconKey(app.packageName) },
             contentDescription = null,
-            imageLoader = AppIconImageLoader.get(context),
             modifier = Modifier
                 .size(DexorDimensions.appIconSizeList)
                 .clip(RoundedCornerShape(DexorDimensions.cornerSmall))

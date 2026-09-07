@@ -3,36 +3,38 @@ package com.wrick.dexor.shizuku
 object DexManager {
     data class DexoptState(val status: String, val reason: String)
 
-    private val STATUS_REGEX = Regex("""\[status=([^\]]+)\]""")
-    private val REASON_REGEX = Regex("""\[reason=([^\]]+)\]""")
-
     /**
      * Parse all package dexopt states from bulk command:
      *   `dumpsys package dexopt`
+     * Uses streaming lineSequence and zero regexes to prevent GC pauses.
      */
     suspend fun getAllDexoptStates(): Map<String, DexoptState> {
         val output = ShizukuHelper.execOrEmpty("dumpsys package dexopt")
         if (output.isBlank()) return emptyMap()
 
         val map = HashMap<String, DexoptState>(400)
-        val lines = output.lines()
-
         var currentPackage: String? = null
 
-        for (line in lines) {
-            val trimmed = line.trim()
-            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
-                val pkgCandidate = trimmed.substring(1, trimmed.length - 1).trim()
+        output.lineSequence().forEach { rawLine ->
+            val line = rawLine.trim()
+            if (line.startsWith("[") && line.endsWith("]")) {
+                val pkgCandidate = line.substring(1, line.length - 1).trim()
                 if (pkgCandidate.contains(".")) {
                     currentPackage = pkgCandidate
                 }
-            } else if (currentPackage != null && trimmed.contains("[status=")) {
-                val statusMatch = STATUS_REGEX.find(trimmed)
-                val reasonMatch = REASON_REGEX.find(trimmed)
-                if (statusMatch != null) {
-                    val status = statusMatch.groupValues[1].trim()
-                    val reason = reasonMatch?.groupValues?.get(1)?.trim() ?: "unknown"
-                    map[currentPackage] = DexoptState(status, reason)
+            } else if (currentPackage != null) {
+                val statusIdx = line.indexOf("[status=")
+                if (statusIdx != -1) {
+                    val statusEnd = line.indexOf(']', statusIdx)
+                    if (statusEnd != -1) {
+                        val status = line.substring(statusIdx + 8, statusEnd).trim()
+                        val reasonIdx = line.indexOf("[reason=")
+                        val reason = if (reasonIdx != -1) {
+                            val reasonEnd = line.indexOf(']', reasonIdx)
+                            if (reasonEnd != -1) line.substring(reasonIdx + 8, reasonEnd).trim() else "unknown"
+                        } else "unknown"
+                        map[currentPackage!!] = DexoptState(status, reason)
+                    }
                 }
             }
         }
@@ -48,14 +50,18 @@ object DexManager {
         val output = ShizukuHelper.execOrEmpty(command)
 
         if (output.isNotBlank()) {
-            val statusMatch = STATUS_REGEX.find(output)
-            val reasonMatch = REASON_REGEX.find(output)
-
-            if (statusMatch != null) {
-                return DexoptState(
-                    status = statusMatch.groupValues[1].trim(),
-                    reason = reasonMatch?.groupValues?.get(1)?.trim() ?: "unknown"
-                )
+            val statusIdx = output.indexOf("[status=")
+            if (statusIdx != -1) {
+                val statusEnd = output.indexOf(']', statusIdx)
+                if (statusEnd != -1) {
+                    val status = output.substring(statusIdx + 8, statusEnd).trim()
+                    val reasonIdx = output.indexOf("[reason=")
+                    val reason = if (reasonIdx != -1) {
+                        val reasonEnd = output.indexOf(']', reasonIdx)
+                        if (reasonEnd != -1) output.substring(reasonIdx + 8, reasonEnd).trim() else "unknown"
+                    } else "unknown"
+                    return DexoptState(status, reason)
+                }
             }
         }
 

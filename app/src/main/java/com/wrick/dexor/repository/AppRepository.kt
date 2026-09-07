@@ -60,11 +60,16 @@ class AppRepository(
                 for (pkg in chunk) {
                     val ai = pkg.applicationInfo ?: continue
                     val pkgName = pkg.packageName
-                    val name = pm.getApplicationLabel(ai).toString()
                     val lastUpdate = pkg.lastUpdateTime
-
                     val isSystem = (ai.flags and ApplicationInfo.FLAG_SYSTEM) != 0
                     val saved = savedEntities[pkgName]
+
+                    // Use cached label from SQLite if package has not been updated (bypasses 350+ Binder IPC calls)
+                    val name = if (saved != null && !saved.appName.isNullOrEmpty() && saved.lastUpdateTime == lastUpdate) {
+                        saved.appName
+                    } else {
+                        pm.getApplicationLabel(ai).toString()
+                    }
 
                     val source = if (isSystem) {
                         InstallSource.SYSTEM
@@ -137,7 +142,8 @@ class AppRepository(
                             lastUpdateTime = lastUpdate,
                             lastCompilationTimestamp = saved?.lastCompilationTimestamp,
                             statusChangeTimestamp = statusChangeTimestamp ?: saved?.statusChangeTimestamp,
-                            installSource = source.name
+                            installSource = source.name,
+                            appName = name
                         )
                     )
                 }

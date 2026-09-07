@@ -11,12 +11,15 @@ import com.wrick.dexor.model.ShizukuState
 import com.wrick.dexor.model.SortMode
 import com.wrick.dexor.repository.AppRepository
 import com.wrick.dexor.shizuku.ShizukuHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -41,8 +44,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    /** Master filtered by search and sorted */
-    val sortedSearchedApps: StateFlow<List<AppInfo>> = combine(
+    /** Master filtered by search, sorted, and partitioned (computed on Dispatchers.Default) */
+    private val _appLists = combine(
         _allApps, _sortMode, _searchQuery
     ) { apps, sort, query ->
         val filtered = if (query.isBlank()) {
@@ -54,26 +57,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 app.packageName.contains(q, ignoreCase = true)
             }
         }
-        when (sort) {
-            SortMode.NAME -> filtered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-            SortMode.DEX_STATUS -> filtered.sortedWith(
-                compareBy<AppInfo> {
-                    when (it.dexStatus.lowercase()) {
-                        "speed", "speed-profile" -> 0
-                        "everything" -> 1
-                        "space" -> 2
-                        "verify" -> 3
-                        "run-from-apk", "interpret-only" -> 4
-                        else -> 5
-                    }
-                }.thenComparing(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-            )
-            SortMode.SOURCE -> filtered.sortedWith(
-                compareBy<AppInfo> { it.source.ordinal }
-                    .thenComparing(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-            )
+        val comparator = when (sort) {
+            SortMode.NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+            SortMode.DEX_STATUS -> compareBy<AppInfo> {
+                when (it.dexStatus.lowercase()) {
+                    "speed", "speed-profile" -> 0
+                    "everything" -> 1
+                    "space" -> 2
+                    "verify" -> 3
+                    "run-from-apk", "interpret-only" -> 4
+                    else -> 5
+                }
+            }.thenComparing(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+            SortMode.SOURCE -> compareBy<AppInfo> { it.source.ordinal }
+                .thenComparing(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
         }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        val sorted = filtered.sortedWith(comparator)
+        val user = ArrayList<AppInfo>(sorted.size)
+        val system = ArrayList<AppInfo>(sorted.size)
+        for (app in sorted) {
+            if (app.source == InstallSource.SYSTEM) {
+                system.add(app)
+            } else {
+                user.add(app)
+            }
+        }
+        Triple<List<AppInfo>, List<AppInfo>, List<AppInfo>>(sorted, user, system)
+    }.flowOn(Dispatchers.Default).stateIn(
+        viewModelScope,
+        SharingStarted.Lazily,
+        Triple(emptyList(), emptyList(), emptyList())
+    )
+
+    val sortedSearchedApps: StateFlow<List<AppInfo>> = _appLists.map { it.first }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val userApps: StateFlow<List<AppInfo>> = _appLists.map { it.second }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val systemApps: StateFlow<List<AppInfo>> = _appLists.map { it.third }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     // --- UI state ---
     private val _isLoading = MutableStateFlow(false)
@@ -101,12 +124,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isCompilingDetail = MutableStateFlow(false)
     val isCompilingDetail: StateFlow<Boolean> = _isCompilingDetail.asStateFlow()
 
-    // Permissions Dialog State
-    private val _showPermissionsDialog = MutableStateFlow(false)
-    val showPermissionsDialog: StateFlow<Boolean> = _showPermissionsDialog.asStateFlow()
+    // Settings & Permissions Dialog State
+    private val _showSettingsDialog = MutableStateFlow(false)
+    val showSettingsDialog: StateFlow<Boolean> = _showSettingsDialog.asStateFlow()
 
-    fun openPermissionsDialog() { _showPermissionsDialog.value = true }
-    fun closePermissionsDialog() { _showPermissionsDialog.value = false }
+    fun openSettingsDialog() { _showSettingsDialog.value = true }
+    fun closeSettingsDialog() { _showSettingsDialog.value = false }
+
+    // Compatibility aliases
+    val showPermissionsDialog: StateFlow<Boolean> get() = showSettingsDialog
+    fun openPermissionsDialog() = openSettingsDialog()
+    fun closePermissionsDialog() = closeSettingsDialog()
 
     private var detailJob: Job? = null
 
@@ -132,10 +160,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // --- Actions ---
 
     fun refreshShizukuState() {
-        _shizukuState.value = when {
-            !ShizukuHelper.isShizukuAvailable() -> ShizukuState.NOT_RUNNING
-            !ShizukuHelper.hasPermission() -> ShizukuState.NO_PERMISSION
-            else -> ShizukuState.READY
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = when {
+                !ShizukuHelper.isShizukuAvailable() -> ShizukuState.NOT_RUNNING
+                !ShizukuHelper.hasPermission() -> ShizukuState.NO_PERMISSION
+                else -> ShizukuState.READY
+            }
+            _shizukuState.value = state
         }
     }
 
@@ -211,7 +242,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun compileApp(packageName: String, mode: String) {
         if (!ShizukuHelper.isShizukuAvailable() || !ShizukuHelper.hasPermission()) {
             _snackMessage.value = "Shizuku permission required to apply mode"
-            _showPermissionsDialog.value = true
+            _showSettingsDialog.value = true
             return
         }
 
@@ -240,7 +271,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun compileBatch(mode: String) {
         if (!ShizukuHelper.isShizukuAvailable() || !ShizukuHelper.hasPermission()) {
             _snackMessage.value = "Shizuku permission required to apply mode"
-            _showPermissionsDialog.value = true
+            _showSettingsDialog.value = true
             return
         }
 

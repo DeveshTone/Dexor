@@ -23,7 +23,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -79,4 +81,7 @@ dependencies {
 
     // Coil for async icon loading
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // Baseline Profile installer for ahead-of-time runtime optimization
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
 }

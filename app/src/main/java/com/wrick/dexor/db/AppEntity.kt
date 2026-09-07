@@ -1,4 +1,4 @@
-﻿package com.wrick.dexor.db
+package com.wrick.dexor.db
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -11,6 +11,7 @@ data class AppEntity(
     val lastUpdateTime: Long,
     val lastCompilationTimestamp: Long?,
     val statusChangeTimestamp: Long?,
-    val installSource: String? = null
+    val installSource: String? = null,
+    val appName: String? = null
 )
 

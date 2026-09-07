@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -54,7 +55,6 @@ fun MainScreen(
     viewModel: MainViewModel,
     windowSizeClass: WindowSizeClass? = null
 ) {
-    val sortedSearchedApps by viewModel.sortedSearchedApps.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
     val selectedApps by viewModel.selectedApps.collectAsState()
@@ -74,7 +74,7 @@ fun MainScreen(
     // Single app detail state
     val detailApp by viewModel.detailApp.collectAsState()
     val isCompilingDetail by viewModel.isCompilingDetail.collectAsState()
-    val showPermissionsDialog by viewModel.showPermissionsDialog.collectAsState()
+    val showSettingsDialog by viewModel.showSettingsDialog.collectAsState()
 
     var showBatchSheet by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -93,12 +93,13 @@ fun MainScreen(
         viewModel.loadApps()
     }
 
-    // Permissions Dialog
-    if (showPermissionsDialog) {
-        PermissionsDialog(
+    // Settings & Permissions Dialog
+    if (showSettingsDialog) {
+        SettingsDialog(
             shizukuState = shizukuState,
             onRequestPermission = { viewModel.requestShizukuPermission() },
-            onDismiss = { viewModel.closePermissionsDialog() }
+            onRefreshShizuku = { viewModel.refreshShizukuState() },
+            onDismiss = { viewModel.closeSettingsDialog() }
         )
     }
 
@@ -108,7 +109,6 @@ fun MainScreen(
     if (isTwoPane) {
         TwoPaneLayout(
             viewModel = viewModel,
-            allApps = sortedSearchedApps,
             isLoading = isLoading,
             isSelectionMode = isSelectionMode,
             selectedApps = selectedApps,
@@ -164,7 +164,6 @@ fun MainScreen(
             } else {
                 SinglePaneList(
                     viewModel = viewModel,
-                    allApps = sortedSearchedApps,
                     isLoading = isLoading,
                     isSelectionMode = isSelectionMode,
                     selectedApps = selectedApps,
@@ -243,7 +242,6 @@ fun MainScreen(
 @Composable
 private fun SinglePaneList(
     viewModel: MainViewModel,
-    allApps: List<AppInfo>,
     isLoading: Boolean,
     isSelectionMode: Boolean,
     selectedApps: Set<String>,
@@ -273,9 +271,9 @@ private fun SinglePaneList(
 
     val coroutineScope = rememberCoroutineScope()
 
-    // Memoize each tab's sublist for zero-recomposition swiping
-    val userList = remember(allApps) { allApps.filter { it.source != InstallSource.SYSTEM } }
-    val sysList = remember(allApps) { allApps.filter { it.source == InstallSource.SYSTEM } }
+    // Precomputed sublists from ViewModel on Dispatchers.Default (zero in-composition filtering)
+    val userList by viewModel.userApps.collectAsState()
+    val sysList by viewModel.systemApps.collectAsState()
 
     val showScrollToTop by remember(pagerState.currentPage) {
         derivedStateOf {
@@ -360,12 +358,12 @@ private fun SinglePaneList(
                             }
                         }
 
-                        // Permissions Inspector
+                        // Settings & App Info
                         IconButton(
-                            onClick = { viewModel.openPermissionsDialog() },
+                            onClick = { viewModel.openSettingsDialog() },
                             modifier = Modifier.size(DexorDimensions.minTouchTarget)
                         ) {
-                            Icon(Icons.Default.Info, contentDescription = "Permissions Status")
+                            Icon(Icons.Default.Settings, contentDescription = "Settings & About")
                         }
 
                         // Fast Scan Refresh with smooth rotating feedback
@@ -600,21 +598,27 @@ private fun SinglePaneList(
                             key = { it.packageName },
                             contentType = { "app_row" }
                         ) { app ->
+                            val pkgName = app.packageName
+                            val isSelected = selectedApps.contains(pkgName)
                             AppListItem(
                                 app = app,
-                                isSelected = selectedApps.contains(app.packageName),
+                                isSelected = isSelected,
                                 isSelectionMode = isSelectionMode,
-                                onClick = {
-                                    if (isSelectionMode) {
-                                        viewModel.toggleAppSelection(app.packageName)
-                                    } else {
-                                        onOpenDetailWithOrigin(app, page)
+                                onClick = remember(pkgName, isSelectionMode, page) {
+                                    {
+                                        if (isSelectionMode) {
+                                            viewModel.toggleAppSelection(pkgName)
+                                        } else {
+                                            onOpenDetailWithOrigin(app, page)
+                                        }
                                     }
                                 },
-                                onLongClick = {
-                                    if (!isSelectionMode) {
-                                        viewModel.toggleSelectionMode()
-                                        viewModel.toggleAppSelection(app.packageName)
+                                onLongClick = remember(pkgName, isSelectionMode) {
+                                    {
+                                        if (!isSelectionMode) {
+                                            viewModel.toggleSelectionMode()
+                                            viewModel.toggleAppSelection(pkgName)
+                                        }
                                     }
                                 }
                             )
@@ -630,7 +634,6 @@ private fun SinglePaneList(
 @Composable
 private fun TwoPaneLayout(
     viewModel: MainViewModel,
-    allApps: List<AppInfo>,
     isLoading: Boolean,
     isSelectionMode: Boolean,
     selectedApps: Set<String>,
@@ -652,7 +655,6 @@ private fun TwoPaneLayout(
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             SinglePaneList(
                 viewModel = viewModel,
-                allApps = allApps,
                 isLoading = isLoading,
                 isSelectionMode = isSelectionMode,
                 selectedApps = selectedApps,
