@@ -93,16 +93,6 @@ fun MainScreen(
         viewModel.loadApps()
     }
 
-    // Settings & Permissions Dialog
-    if (showSettingsDialog) {
-        SettingsDialog(
-            shizukuState = shizukuState,
-            onRequestPermission = { viewModel.requestShizukuPermission() },
-            onRefreshShizuku = { viewModel.refreshShizukuState() },
-            onDismiss = { viewModel.closeSettingsDialog() }
-        )
-    }
-
     val isTwoPane = windowSizeClass != null &&
             (windowSizeClass.widthSizeClass == WindowWidthSizeClass.Expanded)
 
@@ -124,7 +114,9 @@ fun MainScreen(
             onToggleSearch = { showSearch = !showSearch },
             showSortMenu = showSortMenu,
             onToggleSortMenu = { showSortMenu = it },
-            onOpenBatch = { showBatchSheet = true }
+            onOpenBatch = { showBatchSheet = true },
+            showSettings = showSettingsDialog,
+            onCloseSettings = { viewModel.closeSettingsDialog() }
         )
     } else {
         // Cache the active detail app reference so the outgoing exit transition always renders AppDetailScreen
@@ -135,12 +127,16 @@ fun MainScreen(
             }
         }
 
-        val isViewingDetail = detailApp != null
+        val screenState = when {
+            showSettingsDialog -> "SETTINGS"
+            detailApp != null -> "DETAIL"
+            else -> "LIST"
+        }
 
         AnimatedContent(
-            targetState = isViewingDetail,
+            targetState = screenState,
             transitionSpec = {
-                if (targetState) {
+                if (targetState == "SETTINGS" || targetState == "DETAIL") {
                     (slideInHorizontally(initialOffsetX = { it }) + fadeIn())
                         .togetherWith(slideOutHorizontally(targetOffsetX = { -it / 3 }) + fadeOut())
                 } else {
@@ -149,40 +145,53 @@ fun MainScreen(
                 }
             },
             label = "ScreenTransition"
-        ) { inDetail ->
-            val appToShow = if (inDetail) (detailApp ?: activeDetailApp) else null
-            if (appToShow != null) {
-                AppDetailScreen(
-                    app = appToShow,
-                    isCompiling = isCompilingDetail,
-                    isShizukuReady = shizukuState == ShizukuState.READY,
-                    onRequestPermission = { viewModel.requestShizukuPermission() },
-                    onBack = { viewModel.closeAppDetail() },
-                    onCompile = { mode -> viewModel.compileApp(appToShow.packageName, mode) },
-                    showBackButton = true
-                )
-            } else {
-                SinglePaneList(
-                    viewModel = viewModel,
-                    isLoading = isLoading,
-                    isSelectionMode = isSelectionMode,
-                    selectedApps = selectedApps,
-                    shizukuState = shizukuState,
-                    currentSort = currentSort,
-                    searchQuery = searchQuery,
-                    userListState = userListState,
-                    sysListState = sysListState,
-                    pagerState = pagerState,
-                    onOpenDetailWithOrigin = { app, originPage ->
-                        detailOriginPage = originPage
-                        viewModel.openAppDetail(app)
-                    },
-                    showSearch = showSearch,
-                    onToggleSearch = { showSearch = !showSearch },
-                    showSortMenu = showSortMenu,
-                    onToggleSortMenu = { showSortMenu = it },
-                    onOpenBatch = { showBatchSheet = true }
-                )
+        ) { state ->
+            when (state) {
+                "SETTINGS" -> {
+                    SettingsScreen(
+                        shizukuState = shizukuState,
+                        onRequestPermission = { viewModel.requestShizukuPermission() },
+                        onRefreshShizuku = { viewModel.refreshShizukuState() },
+                        onBack = { viewModel.closeSettingsDialog() }
+                    )
+                }
+                "DETAIL" -> {
+                    val appToShow = detailApp ?: activeDetailApp
+                    if (appToShow != null) {
+                        AppDetailScreen(
+                            app = appToShow,
+                            isCompiling = isCompilingDetail,
+                            isShizukuReady = shizukuState == ShizukuState.READY,
+                            onRequestPermission = { viewModel.requestShizukuPermission() },
+                            onBack = { viewModel.closeAppDetail() },
+                            onCompile = { mode -> viewModel.compileApp(appToShow.packageName, mode) },
+                            showBackButton = true
+                        )
+                    }
+                }
+                else -> {
+                    SinglePaneList(
+                        viewModel = viewModel,
+                        isLoading = isLoading,
+                        isSelectionMode = isSelectionMode,
+                        selectedApps = selectedApps,
+                        shizukuState = shizukuState,
+                        currentSort = currentSort,
+                        searchQuery = searchQuery,
+                        userListState = userListState,
+                        sysListState = sysListState,
+                        pagerState = pagerState,
+                        onOpenDetailWithOrigin = { app, originPage ->
+                            detailOriginPage = originPage
+                            viewModel.openAppDetail(app)
+                        },
+                        showSearch = showSearch,
+                        onToggleSearch = { showSearch = !showSearch },
+                        showSortMenu = showSortMenu,
+                        onToggleSortMenu = { showSortMenu = it },
+                        onOpenBatch = { showBatchSheet = true }
+                    )
+                }
             }
         }
     }
@@ -649,7 +658,9 @@ private fun TwoPaneLayout(
     onToggleSearch: () -> Unit,
     showSortMenu: Boolean,
     onToggleSortMenu: (Boolean) -> Unit,
-    onOpenBatch: () -> Unit
+    onOpenBatch: () -> Unit,
+    showSettings: Boolean,
+    onCloseSettings: () -> Unit
 ) {
     Row(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -679,7 +690,14 @@ private fun TwoPaneLayout(
         )
 
         Box(modifier = Modifier.weight(1.2f).fillMaxHeight()) {
-            if (detailApp != null) {
+            if (showSettings) {
+                SettingsScreen(
+                    shizukuState = shizukuState,
+                    onRequestPermission = { viewModel.requestShizukuPermission() },
+                    onRefreshShizuku = { viewModel.refreshShizukuState() },
+                    onBack = onCloseSettings
+                )
+            } else if (detailApp != null) {
                 AppDetailScreen(
                     app = detailApp,
                     isCompiling = isCompilingDetail,
