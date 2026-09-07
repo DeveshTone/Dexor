@@ -26,14 +26,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.wrick.dexor.R
 import com.wrick.dexor.model.ShizukuState
 import com.wrick.dexor.ui.theme.DexorCodeFont
 
@@ -184,6 +184,16 @@ fun SettingsDialog(
 
 @Composable
 private fun HeroBrandCard() {
+    val context = LocalContext.current
+    val appIconBitmap = remember(context) {
+        try {
+            val drawable = context.packageManager.getApplicationIcon(context.packageName)
+            drawable.toBitmap(width = 128, height = 128).asImageBitmap()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF161B22)),
@@ -208,11 +218,20 @@ private fun HeroBrandCard() {
                     modifier = Modifier.size(54.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Image(
-                            painter = painterResource(id = R.mipmap.ic_launcher),
-                            contentDescription = "Dexor Icon",
-                            modifier = Modifier.size(46.dp)
-                        )
+                        if (appIconBitmap != null) {
+                            Image(
+                                bitmap = appIconBitmap,
+                                contentDescription = "Dexor Icon",
+                                modifier = Modifier.size(46.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Dexor Icon",
+                                tint = Color(0xFF58A6FF),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
 
