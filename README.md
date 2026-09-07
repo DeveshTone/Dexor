@@ -11,7 +11,7 @@
   <a href="https://developer.android.com"><img src="https://img.shields.io/badge/Android-9.0%20--%2015%20(API%2028--35)-brightgreen?style=flat-square" alt="Android Support" /></a>
   <a href="https://github.com/RikkaApps/Shizuku"><img src="https://img.shields.io/badge/Shizuku-API%2013.1+-orange?style=flat-square" alt="Shizuku Required" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/APK%20Size-3.29%20MB-purple?style=flat-square" alt="APK Size" />
+  <img src="https://img.shields.io/badge/APK%20Size-3.16%20MB-purple?style=flat-square" alt="APK Size" />
   <img src="https://img.shields.io/badge/Privacy-100%25%20Offline%20(Zero%20Internet)-success?style=flat-square" alt="100% Offline" />
 </p>
 
@@ -49,7 +49,7 @@ When Android apps are installed or updated, they consist of Dalvik Executable (D
 - **Batch Optimization Pipeline:** Select multiple apps across user and system categories to compile sequentially, featuring live progress indicators and estimated time calculations.
 - **Instant Search & Multi-Criteria Filtering:** Filter between User and System apps, and sort instantly by App Name, DEX Status, or Package Source.
 - **100% Offline & Private:** `android.permission.INTERNET` is completely absent from the manifest. Dexor does not collect telemetry, track usage, or display advertisements.
-- **Lightweight & High Performance:** Built with Jetpack Compose, an asynchronous coroutine pipeline, in-memory Room caching, and compressed to just **3.29 MB** with R8 full minification.
+- **Lightweight & High Performance:** Built with Jetpack Compose, an asynchronous coroutine pipeline, in-memory Room caching, and compressed to just **3.16 MB** with R8 full minification.
 
 ---
 
