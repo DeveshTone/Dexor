@@ -17,11 +17,18 @@
 
 ---
 
-## Overview
+## What is Dexor?
 
-**Dexor** is an advanced, non-root Android application ahead-of-time (AOT) bytecode compilation and dexopt utility. Powered by the Android Runtime (`dex2oat`) and [Shizuku](https://github.com/RikkaApps/Shizuku), Dexor enables users and developers to inspect deep runtime compilation statuses across user and system applications, execute on-demand or batch DEX optimizations, eliminate JIT warmup latency, and reclaim device storage without root privileges.
+**Dexor** is a modern, non-root Android utility that puts you in control of how your applications are compiled and executed by the **Android Runtime (ART)**.
 
-Designed with a clean, dark Material 3 aesthetic, Dexor provides a modern, responsive environment with zero telemetry, zero advertisements, and strict privacy by design.
+By leveraging [Shizuku](https://github.com/RikkaApps/Shizuku) to interface safely with Android's internal compilation service (`cmd package compile`), Dexor lets you trigger on-demand and batch Ahead-Of-Time (AOT) compilation without requiring root access.
+
+### How it Works (Why You Need It)
+
+When Android apps are installed or updated, they consist of Dalvik Executable (DEX) bytecode. To execute this code quickly, the Android Runtime (`dex2oat`) compiles bytecode into native machine code.
+
+- **The Default Behavior:** Normally, Android only runs full AOT compilation during idle maintenance—when your device is connected to a charger, at 100% battery, and completely untouched overnight (`bg-dexopt`). Otherwise, apps run through Just-In-Time (JIT) interpretation, leading to initial launch delays and micro-stutters while code compiles on the fly.
+- **The Dexor Solution:** Dexor unlocks immediate, granular control over this process. You can force-compile demanding apps or games to `speed` mode to eliminate JIT warmups, or revert unneeded apps to `verify` mode to reclaim gigabytes of storage space—all with a single tap.
 
 ---
 
@@ -37,58 +44,53 @@ Designed with a clean, dark Material 3 aesthetic, Dexor provides a modern, respo
 
 ## Key Features
 
-- **Non-Root Elevated Compilation:** Harnesses Shizuku IPC to trigger Android's native `cmd package compile` endpoints safely without rooting your device.
-- **Deep Dexopt State Inspection:** Zero-allocation linear parser inspects compiler filters (`speed`, `space`, `verify`, etc.), compilation reasons (`cmdline`, `install`, `bg-dexopt`), and primary/split APK statuses.
-- **Batch Processing:** Select multiple user or system applications and compile them in an automated, sequential pipeline with live progress tracking.
-- **Instant Search & Multi-Criteria Sorting:** Fast search across app names and package IDs, with sorting by Name, DEX Status, or Installation Source offloaded to background worker threads.
-- **Built-in System Diagnostics:** Live inspection of connected device hardware, Android OS release, SDK API level, and CPU architecture (ABIs).
-- **100% Offline & Private:** `android.permission.INTERNET` is completely absent from the manifest. Dexor physically cannot make network requests or transmit analytics.
+- **Elevated AOT Compilation Without Root:** Utilizes Shizuku IPC to safely execute native `cmd package compile` commands without modifying system partitions.
+- **Deep Dexopt State Inspection:** Inspect real-time compiler filters (`speed`, `space`, `verify`, `everything`), compilation trigger reasons (`cmdline`, `install`, `bg-dexopt`), and APK path details for every installed package.
+- **Batch Optimization Pipeline:** Select multiple apps across user and system categories to compile sequentially, featuring live progress indicators and estimated time calculations.
+- **Instant Search & Multi-Criteria Filtering:** Filter between User and System apps, and sort instantly by App Name, DEX Status, or Package Source.
+- **100% Offline & Private:** `android.permission.INTERNET` is completely absent from the manifest. Dexor does not collect telemetry, track usage, or display advertisements.
+- **Lightweight & High Performance:** Built with Jetpack Compose, an asynchronous coroutine pipeline, in-memory Room caching, and compressed to just **3.29 MB** with R8 full minification.
 
 ---
 
 ## Compilation Modes
 
-Dexor interfaces directly with the Android Runtime (`dex2oat`). Select the compiler filter that best suits your performance and storage balance:
+Dexor exposes Android's native compilation filters so you can balance runtime execution performance with device storage:
 
-| Mode | Filter | Description | Storage Footprint | Typical Duration |
-| :--- | :--- | :--- | :---: | :---: |
-| **Speed** | `speed` | Force-compiles all accessible app bytecode methods into native machine code. Eliminates JIT compilation stutter and maximizes runtime execution speed (recommended for games and high-throughput apps). | High | ~30s / app |
-| **Space** | `space` | Compiles core application initialization and entry points. Balances disk storage conservation with stable app launch responsiveness. | Low–Medium | ~15s / app |
-| **Verify** | `verify` | Validates DEX bytecode structure and dependencies without generating native AOT machine code. Clears AOT compilation cache to reclaim maximum storage space. | Minimum | ~5s / app |
-| **Everything** | `everything` | Exhaustively compiles every method, class, and auxiliary DEX file unconditionally. Guarantees 100% native execution across all application code. | Maximum | ~60s / app |
-
----
-
-## Performance & Architecture
-
-Dexor is engineered with strict mobile performance principles:
-
-- **R8 Full ProGuard Minification:** Full R8 obfuscation and resource shrinking reduce the release binary from 21.5 MB down to **3.29 MB** (an 85% size reduction).
-- **Asynchronous Coroutine Pipeline:** List filtering, searching, and multi-criteria sorting are offloaded from the UI thread to `Dispatchers.Default`.
-- **Zero-Allocation Dumpsys Parsing:** Optimized single-pass substring parsing for `dumpsys package dexopt` eliminates object allocations during package scans.
-- **Smart WebP Disk Cache:** Lossy WebP (85% quality) caching eliminates repeated `PackageManager` IPC calls and prevents UI micro-stutters during list scrolling.
-- **Room v4 Indexed Persistence:** Caches application metadata and package names locally for instant cold boots.
+| Mode | Filter Flag | How It Works | Storage Impact | Best Used For |
+| :--- | :--- | :--- | :---: | :--- |
+| **Speed** | `speed` | Force-compiles all accessible bytecode methods into native machine code. Eliminates JIT compilation stutters. | High | Games, daily drivers, and performance-sensitive apps. |
+| **Space** | `space` | Compiles core application initialization and entry points only. | Low–Medium | General apps where saving disk space is prioritized over peak velocity. |
+| **Verify** | `verify` | Validates DEX bytecode structure without generating native machine code. Reverts the app to the raw JIT interpreter. | Minimum | Reclaiming maximum storage space from rarely used apps. |
+| **Everything** | `everything` | Exhaustively compiles every method and resolves all class references unconditionally. | Maximum | Complete native execution across entire APK codebase. |
 
 ---
 
 ## Requirements
 
-- **Android Version:** Android 9.0 to Android 15 (API levels 28 – 35).
-- **Privilege Manager:** [Shizuku](https://github.com/RikkaApps/Shizuku) (v13.1.5 or newer) running via Wireless Debugging, ADB, or Root.
+- **Android Version:** Android 9.0 to Android 15 (API 28 – 35)
+- **Privilege Manager:** [Shizuku](https://github.com/RikkaApps/Shizuku) (v13.1.5 or newer) running via Wireless Debugging, ADB, or Root
 
 > [!NOTE]
-> Without Shizuku authorization, Dexor operates in a read-only inspection mode and cannot trigger elevated compilation commands.
+> Shizuku is required to grant Dexor the elevated permissions needed to trigger package compilation. If Shizuku is inactive, Dexor operates in a read-only inspection mode. Visit the [Shizuku Setup Guide](https://shizuku.rikka.app/guide/setup/) for setup instructions.
+
+---
+
+## Installation
+
+1. Download the latest **`app-release.apk`** from [GitHub Releases](https://github.com/DeveshTone/Dexor/releases).
+2. Install the APK on your Android device.
+3. Ensure [Shizuku](https://shizuku.rikka.app/) is running, then launch Dexor and grant permission when prompted.
 
 ---
 
 ## Building from Source
 
 ### Prerequisites
-- Android Studio Iguana (or newer) or standalone Gradle 8.4+
+- Android Studio Iguana+ or Gradle 8.4+
 - JDK 17 (Java Development Kit 17)
 - Android SDK Platform 34 & Build Tools 34.0.0
 
-### Build Steps
 ```bash
 # Clone the repository
 git clone https://github.com/DeveshTone/Dexor.git
@@ -102,28 +104,27 @@ The optimized release APK will be generated at:
 
 ---
 
-## Security & Privacy
+## Privacy & Security
 
-Dexor respects user privacy above all else:
-- **No Internet Access:** The network permission `android.permission.INTERNET` is not requested in the `AndroidManifest.xml`.
-- **Zero Telemetry:** No crash reporting SDKs (Firebase, Bugsnag), no tracking frameworks, and no ad libraries.
-- **System Integrity:** Dexor executes standard Android system commands through Shizuku without altering read-only system partitions or kernel parameters.
+Dexor adheres strictly to privacy-first Android development:
+- **Zero Network Permissions:** No `INTERNET` permission requested. Network access is physically impossible.
+- **Zero Trackers:** No analytics SDKs, crash report beacons, or third-party advertising libraries.
+- **System Integrity:** Operates strictly through Android's documented package management endpoints; system partitions remain untouched.
 
 ---
 
-## Credits & Acknowledgements
+## Credits & Open Source
 
+- **Developer:** [DeveshTone](https://github.com/DeveshTone)
 - **[Shizuku](https://github.com/RikkaApps/Shizuku)** by [RikkaApps](https://github.com/RikkaApps) — Elevated Android system APIs without root.
 - **[Jetpack Compose](https://developer.android.com/jetpack/compose)** & AndroidX by Google LLC.
 - **[Room Persistence](https://developer.android.com/training/data-storage/room)** by Google LLC.
-- **[Coil](https://coil-kt.github.io/coil/)** by Coil Contributors — Async image loader for Android.
-- Developed with pair-engineering assistance from **Google Gemini** and **Antigravity**.
 
 ---
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
 
 ```
 Copyright (c) 2026 DeveshTone
