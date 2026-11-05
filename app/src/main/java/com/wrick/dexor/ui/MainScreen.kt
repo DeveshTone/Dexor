@@ -245,6 +245,15 @@ fun MainScreen(
             containerColor = Color(0xFF131720)
         )
     }
+
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+            .padding(horizontal = DexorDimensions.spaceDefault)
+            .wrapContentSize(Alignment.BottomCenter)
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
