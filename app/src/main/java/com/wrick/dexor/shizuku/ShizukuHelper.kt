@@ -2,6 +2,7 @@ package com.wrick.dexor.shizuku
 
 import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 import java.io.BufferedReader
@@ -66,25 +67,38 @@ object ShizukuHelper {
                 null
             ) as Process
 
-            // Read stdout
-            val stdout = BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                val sb = StringBuilder()
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    sb.append(line).append("\n")
+            // Drain both streams concurrently to avoid blocking on a full pipe.
+            val stdoutTask = async {
+                BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                    val sb = StringBuilder()
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        sb.append(line).append("\n")
+                    }
+                    sb.toString()
                 }
-                sb.toString()
+            }
+            val stderrTask = async {
+                BufferedReader(InputStreamReader(process.errorStream)).use { it.readText() }
             }
 
-            process.waitFor()
-            val exitCode = process.exitValue()
+            val exitCode = process.waitFor()
+            val stdout = stdoutTask.await()
+            val stderr = stderrTask.await()
 
-            if (exitCode == 0 || stdout.isNotEmpty()) {
+            if (exitCode == 0) {
                 Result.success(stdout)
             } else {
-                // Read stderr for error info
-                val stderr = BufferedReader(InputStreamReader(process.errorStream)).use { it.readText() }
-                Result.failure(Exception("Exit $exitCode: $stderr"))
+                val output = listOf(stdout, stderr)
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .joinToString("\n")
+                val message = if (output.isEmpty()) {
+                    "Exit $exitCode"
+                } else {
+                    "Exit $exitCode: $output"
+                }
+                Result.failure(Exception(message))
             }
         } catch (e: java.lang.reflect.InvocationTargetException) {
             // Unwrap the actual exception from reflection
